@@ -25,7 +25,25 @@ const keyPair = {
     pri: null
 };
 
+(async function generateKeyPair() {
+    const { privateKey, publicKey } = await pgp.generateKey({
+        type: 'rsa',
+        rsaBits: 2048,
+        userIDs: [{ name: 'Timofey Chuchkanov', email: 'crt0r.9@yahoo.com' }],
+        passphrase: 'VrTI8O8Wh9E5b4b7zz3pPMMWN0jdGp0tnSvyreU56AwG92Y65tAKM59FAp6dpFmNb814suMhdpiB6xSkOl9tyU0zpOZmz58JRw6sS49P9xzDP16Tz5hH67numKhLiQOo'
+    });
+    
+    keyPair.pri = privateKey;
+    keyPair.pub = publicKey;
+})()
+
 app.use(cors());
+
+app.get('/pubreq' , (req, res) => {
+    res.format({
+        'text/plain': () => res.send(keyPair.pub)
+    });
+});
 
 app.get('/teacher-timetable/:tid', async (req, res) => {
     const teacherTimetable = await fetchById(req.params.tid, teachersTimetablesUrl);
@@ -54,18 +72,6 @@ app.get('/posts-order', async (req, res) => {
 });
 
 app.listen(port, () => console.log(`started server at http://localhost:${ port }`));
-
-async function generateKeyPair() {
-    const { pri, pub } = await pgp.generateKey({
-        type: 'rsa',
-        rsaBits: 1024,
-        userIDs: [{ name: 'Timofey Chuchkanov', email: 'crt0r.9@yahoo.com' }],
-        passphrace: 'VrTI8O8Wh9E5b4b7zz3pPMMWN0jdGp0tnSvyreU56AwG92Y65tAKM59FAp6dpFmNb814suMhdpiB6xSkOl9tyU0zpOZmz58JRw6sS49P9xzDP16Tz5hH67numKhLiQOo'
-    });
-    
-    keyPair.pri = pri;
-    keyPair.pub = pub;
-}
 
 async function fetchById(id, path) {
     const allTimetables = await fetchFromDb(path);
