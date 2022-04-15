@@ -139,33 +139,32 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/pubreq' , (req, res) => {
-    res.format({
-        'text/plain': () => res.send(keyPair.pub)
-    });
+    res.send({ pub: keyPair.pub })
 });
 
-app.get('/teacher-timetable/:tid', async (req, res) => {
+app.post('/teacher-timetable/:tid', async (req, res) => {
     const teacherTimetable = await fetchById(req.params.tid, teachersTimetablesUrl);
     await extractKeysAndMakeEncryptedResponse(req.body.payload, res, teacherTimetable);
 });
 
-app.get('/timetable/:gid', async (req, res) => {
+app.post('/timetable/:gid', async (req, res) => {
     const groupTimetable = await fetchById(req.params.gid, timetablesUrl);
     console.log(groupTimetable)
     await extractKeysAndMakeEncryptedResponse(req.body.payload, res, groupTimetable);
 });
 
-app.get('/groups', async (req, res) => {
+app.post('/groups', async (req, res) => {
     const groups = await fetchFromDb(groupsUrl);
+    console.log(req.body)
     await extractKeysAndMakeEncryptedResponse(req.body.payload, res, groups);
 });
 
-app.get('/names', async (req, res) => {
+app.post('/names', async (req, res) => {
     const names = await fetchFromDb(namesUrl);
     await extractKeysAndMakeEncryptedResponse(req.body.payload, res, names);
 });
 
-app.get('/posts-order', async (req, res) => {
+app.post('/posts-order', async (req, res) => {
     const order = await fetchFromDb(orderUrl);
     await extractKeysAndMakeEncryptedResponse(req.body.payload, res, order);
 });
@@ -179,12 +178,12 @@ async function extractKeysAndMakeEncryptedResponse(reqPayload, res, payload) {
     if (sharedSecret != config.shared)
         res.sendStatus(403);
 
-    const encryptedResponse = await encryptJsonResponse(payload, pub);
+    const encryptedResponse = await encryptResponse(payload, pub);
 
     res.send({ payload: encryptedResponse });
 }
 
-async function encryptJsonResponse(json, pubKey) {
+async function encryptResponse(json, pubKey) {
     const encryptedResponse = await pgp.encrypt({
         message: await pgp.createMessage({ text: JSON.stringify(json) }),
         encryptionKeys: await pgp.readKey({ armoredKey: pubKey })
