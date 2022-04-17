@@ -9,7 +9,6 @@ import cors from 'cors';
 import express from 'express';
 import { Buffer } from 'buffer';
 import fetch from 'node-fetch';
-import crypto from 'crypto';
 import * as pgp from 'openpgp';
 
 const pass = 'VrTI8O8Wh9E5b4b7zz3pPMMWN0jdGp0tnSvyreU56AwG92Y65tAKM59FAp6dpFmNb814suMhdpiB6xSkOl9tyU0zpOZmz58JRw6sS49P9xzDP16Tz5hH67numKhLiQOo';
@@ -30,8 +29,6 @@ const keyPair = {
 
 (async function generateKeyPair() {
     const { privateKey, publicKey } = await pgp.generateKey({
-        type: 'rsa',
-        rsaBits: 2048,
         userIDs: [{ name: 'Timofey Chuchkanov', email: 'crt0r.9@yahoo.com' }],
         passphrase: pass
     });
@@ -104,19 +101,6 @@ async function decryptClientReqPayload(payload) {
     const { data: decrypted } = await pgp.decrypt({
         message: await pgp.readMessage({ armoredMessage: payload }),
         decryptionKeys: await pgp.decryptKey({ privateKey: await pgp.readPrivateKey({ armoredKey: keyPair.pri }), passphrase: pass})
-    });
-
-    return decrypted;
-}
-
-async function decyptPayloadWithPrivateKey(payload) {
-    const privateKeyDecrypted = await pgp.decryptKey({
-        privateKey: await pgp.readPrivateKey({ armoredKey: keyPair.pri }),
-        passphrase: pass
-    });
-    const { data: decrypted } = await pgp.decrypt({
-        message: await pgp.readMessage({ armoredMessage: payload }),
-        decryptionKeys: privateKeyDecrypted
     });
 
     return decrypted;
