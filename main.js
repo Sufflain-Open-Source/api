@@ -23,8 +23,12 @@ const port = 4870;
 const app = express();
 
 const keyPair = {
-      pub: null,
-      pri: null
+    pub: null,
+    pri: null
+};
+
+const errBadReq = {
+    error: 400
 };
 
 (async function generateKeyPair() {
@@ -32,7 +36,7 @@ const keyPair = {
         userIDs: [{ name: 'Timofey Chuchkanov', email: 'crt0r.9@yahoo.com' }],
         passphrase: pass
     });
-    
+
     keyPair.pri = privateKey;
     keyPair.pub = publicKey;
 })()
@@ -40,56 +44,103 @@ const keyPair = {
 app.use(cors());
 app.use(express.json());
 
-app.get('/pubreq' , (req, res) => {
+app.get('/pubreq', (_, res) => {
     res.send({ pub: keyPair.pub })
 });
 
-app.post('/teacher-timetable/:tid', async (req, res) => {
-    const teacherTimetable = await fetchById(req.params.tid, teachersTimetablesUrl);
-    console.log(teacherTimetable)
-    await extractKeyAndMakeResponse(req.body.payload, res, teacherTimetable);
-});
+app.post('/teacher-timetable/:tid', async (req, res) => (
+    makeResponse(res, await logRequestResponse(req, async () => (
+        await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
+            await fetchById(req.params.tid, teachersTimetablesUrl)
+        ))
+    )))
+));
 
-app.post('/timetable/:gid', async (req, res) => {
-    const groupTimetable = await fetchById(req.params.gid, timetablesUrl);
-    console.log(groupTimetable)
-    await extractKeyAndMakeResponse(req.body.payload, res, groupTimetable);
-});
+app.post('/timetable/:gid', async (req, res) => (
+    makeResponse(res, await logRequestResponse(req, async () => (
+        await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
+            await fetchById(req.params.gid, timetablesUrl)
+        ))
+    )))
+));
 
-app.post('/groups', async (req, res) => {
-    const groups = await fetchFromDb(groupsUrl);
-    console.log(req.body)
-    await extractKeyAndMakeResponse(req.body.payload, res, groups);
-});
+app.post('/groups', async (req, res) => (
+    makeResponse(res, await logRequestResponse(req, async () => (
+        await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
+            await fetchFromDb(groupsUrl)
+        ))
+    )))
+));
 
-app.post('/names', async (req, res) => {
-    const names = await fetchFromDb(namesUrl);
-    console.log(names)
-    await extractKeyAndMakeResponse(req.body.payload, res, names);
-});
+app.post('/names', async (req, res) => (
+    makeResponse(res, await logRequestResponse(req, async () => (
+        await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
+            await fetchFromDb(namesUrl)
+        ))
+    )))
+));
 
-app.post('/posts-order', async (req, res) => {
-    const order = await fetchFromDb(orderUrl);
-    console.log(order)
-    await extractKeyAndMakeResponse(req.body.payload, res, order);
-});
+app.post('/posts-order', async (req, res) => (
+    makeResponse(res, await logRequestResponse(req, async () => (
+        await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
+            await fetchFromDb(orderUrl)
+        ))
+    )))
+));
 
-app.listen(port, () => console.log(`started server at http://localhost:${ port }`));
+app.listen(port, () => console.log(`started server at http://localhost:${port}`));
 
-async function extractKeyAndMakeResponse(reqPayload, res, payload) {
-    const sharedSecret = await decryptClientReqPayload(reqPayload);
+async function validatePgpMessageAndGetDataFromDb(payload, dbReq) {
+    const pgpMessage = await readAndValidatePgpMessage(payload);
 
-    if (sharedSecret != config.shared)
-        res.sendStatus(403);
+    if (pgpMessage.error) {
+        console.log({ pgpMessage })
+        return errBadReq;
+    } else {
+        const sharedSecret = await decryptClientReqPayload(pgpMessage);
 
-    res.send(payload);
+        if (sharedSecret != config.shared) {
+            console.log({ sharedSecret })
+            return errBadReq;
+        }
+
+        return await dbReq();
+    }
 }
 
-async function decryptClientReqPayload(payload) {
-    const { data: decrypted } = await pgp.decrypt({
-        message: await pgp.readMessage({ armoredMessage: payload }),
-        decryptionKeys: await pgp.decryptKey({ privateKey: await pgp.readPrivateKey({ armoredKey: keyPair.pri }), passphrase: pass})
+async function readAndValidatePgpMessage(payload) {
+    try {
+        var pgpMessage = await pgp.readMessage({ armoredMessage: payload });
+    } catch (e) {
+        console.log({ payload, err: e.message })
+        return { error: true };
+    }
+
+    return pgpMessage;
+}
+
+function makeResponse(res, payload) {
+    if (payload.error)
+        res.sendStatus(payload.error);
+    else
+        res.send(payload);
+}
+
+async function decryptClientReqPayload(pgpMessage) {
+    const privateKey = await pgp.readPrivateKey({ armoredKey: keyPair.pri });
+    const decryptionKeys = await pgp.decryptKey({
+        privateKey,
+        passphrase: pass
     });
+
+    try {
+        var { data: decrypted } = await pgp.decrypt({
+            message: pgpMessage,
+            decryptionKeys
+        });
+    } catch (e) {
+        return errBadReq;
+    }
 
     return decrypted;
 }
@@ -102,15 +153,15 @@ async function fetchById(id, path) {
 }
 
 async function fetchFromDb(fullPath) {
-    const credentials = Buffer.from(`${ config.user.name }:${ config.user.password }`).toString('base64');
+    const credentials = Buffer.from(`${config.user.name}:${config.user.password}`).toString('base64');
 
     const response = await fetch(fullPath, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Accept': 'application/json',
-                'Authorization': `Basic ${ credentials }`
-            }
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': `Basic ${credentials}`
+        }
     });
 
     const json = await response.json();
@@ -123,4 +174,18 @@ function removeInternalFields(obj) {
     const { _rev, _id, ...cleanData } = obj;
 
     return cleanData;
+}
+
+async function logRequestResponse({ hostname, path }, makeResPayload) {
+    console.log(`━━━━[REQ/RES START]━━━━ (${new Date(Date.now()).toGMTString()})`)
+
+    const logMessage = {};
+    const resPayload = await makeResPayload();
+
+    logMessage[`${hostname} ➔ ${path}`] = { resPayload };
+
+    console.dir(logMessage, { depth: null });
+    console.log('━━━━[REQ/RES END]━━━━')
+
+    return resPayload;
 }
