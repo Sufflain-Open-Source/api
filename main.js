@@ -35,10 +35,7 @@ const keyPair = {
     
     keyPair.pri = privateKey;
     keyPair.pub = publicKey;
-    console.log(keyPair)
 })()
-
-console.log(keyPair)
 
 app.use(cors());
 app.use(express.json());
@@ -49,52 +46,43 @@ app.get('/pubreq' , (req, res) => {
 
 app.post('/teacher-timetable/:tid', async (req, res) => {
     const teacherTimetable = await fetchById(req.params.tid, teachersTimetablesUrl);
-    await extractKeysAndMakeEncryptedResponse(req.body.payload, res, teacherTimetable);
+    console.log(teacherTimetable)
+    await extractKeyAndMakeResponse(req.body.payload, res, teacherTimetable);
 });
 
 app.post('/timetable/:gid', async (req, res) => {
     const groupTimetable = await fetchById(req.params.gid, timetablesUrl);
     console.log(groupTimetable)
-    await extractKeysAndMakeEncryptedResponse(req.body.payload, res, groupTimetable);
+    await extractKeyAndMakeResponse(req.body.payload, res, groupTimetable);
 });
 
 app.post('/groups', async (req, res) => {
     const groups = await fetchFromDb(groupsUrl);
     console.log(req.body)
-    await extractKeysAndMakeEncryptedResponse(req.body.payload, res, groups);
+    await extractKeyAndMakeResponse(req.body.payload, res, groups);
 });
 
 app.post('/names', async (req, res) => {
     const names = await fetchFromDb(namesUrl);
-    await extractKeysAndMakeEncryptedResponse(req.body.payload, res, names);
+    console.log(names)
+    await extractKeyAndMakeResponse(req.body.payload, res, names);
 });
 
 app.post('/posts-order', async (req, res) => {
     const order = await fetchFromDb(orderUrl);
-    await extractKeysAndMakeEncryptedResponse(req.body.payload, res, order);
+    console.log(order)
+    await extractKeyAndMakeResponse(req.body.payload, res, order);
 });
 
 app.listen(port, () => console.log(`started server at http://localhost:${ port }`));
 
-async function extractKeysAndMakeEncryptedResponse(reqPayload, res, payload) {
-    const decryptedPayload = await decryptClientReqPayload(reqPayload);
-    const [ sharedSecret, pub ] = decryptedPayload.split('@');
+async function extractKeyAndMakeResponse(reqPayload, res, payload) {
+    const sharedSecret = await decryptClientReqPayload(reqPayload);
 
     if (sharedSecret != config.shared)
         res.sendStatus(403);
 
-    const encryptedResponse = await encryptResponse(payload, pub);
-
-    res.send({ payload: encryptedResponse });
-}
-
-async function encryptResponse(json, pubKey) {
-    const encryptedResponse = await pgp.encrypt({
-        message: await pgp.createMessage({ text: JSON.stringify(json) }),
-        encryptionKeys: await pgp.readKey({ armoredKey: pubKey })
-    });
-
-    return encryptedResponse;
+    res.send(payload);
 }
 
 async function decryptClientReqPayload(payload) {
