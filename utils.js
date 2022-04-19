@@ -5,6 +5,7 @@
  */
 
 export function makeLogger({ hostname, path, method }, resPayloadOrMaker, options) {
+    const logMessageKey = `[${ method }] ${hostname} ➔ ${path}`
     const logMessage = {};
     let logger;
 
@@ -24,17 +25,17 @@ export function makeLogger({ hostname, path, method }, resPayloadOrMaker, option
         logger = () => {
             loggerHead();
             const payload = resPayloadOrMaker();
-            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            logMessage[logMessageKey] = { resPayload: payload };
             loggerBody();
             loggerTail();
 
-            return payload ;
+            return payload;
         };
     } else if (options && options.isDataReady) {
         logger = () => {
             loggerHead();
             const payload = resPayloadOrMaker;
-            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            logMessage[logMessageKey] = { resPayload: payload };
             loggerBody();
             loggerTail();
             
@@ -44,7 +45,7 @@ export function makeLogger({ hostname, path, method }, resPayloadOrMaker, option
         logger = async () => {
             loggerHead();
             const payload = await resPayloadOrMaker();
-            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            logMessage[logMessageKey] = { resPayload: payload };
             loggerBody();
             loggerTail();
 
