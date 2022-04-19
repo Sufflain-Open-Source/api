@@ -19,4 +19,4 @@ app.use(express.json());
 
 setupEndpoints(app, keyPair);
 
-app.listen(port, () => console.log(`started server at http://localhost:${port}`));
+app.listen(port, () => console.log(`started server at port ${port}`));

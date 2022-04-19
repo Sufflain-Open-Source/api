@@ -4,16 +4,53 @@
     Licensed under the Sufflain Private Module License.
  */
 
-export async function logRequestResponse({ hostname, path }, makeResPayload) {
-    console.log(`━━━━[REQ/RES START]━━━━ (${new Date(Date.now()).toGMTString()})`)
-
+export function makeLogger({ hostname, path, method }, resPayloadOrMaker, options) {
     const logMessage = {};
-    const resPayload = await makeResPayload();
+    let logger;
 
-    logMessage[`${hostname} ➔ ${path}`] = { resPayload };
+    const loggerHead = () => (
+        console.log(`━━━━[REQ/RES START]━━━━ (${new Date(Date.now()).toGMTString()})`)
+    );
 
-    console.dir(logMessage, { depth: null });
-    console.log('━━━━[REQ/RES END]━━━━')
+    const loggerBody = () => (
+        console.dir(logMessage, { depth: null })
+    );
 
-    return resPayload;
+    const loggerTail = () => (
+        console.log('━━━━[REQ/RES END]━━━━')
+    );
+
+    if (options && options.sync) {
+        logger = () => {
+            loggerHead();
+            const payload = resPayloadOrMaker();
+            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            loggerBody();
+            loggerTail();
+
+            return payload ;
+        };
+    } else if (options && options.isDataReady) {
+        logger = () => {
+            loggerHead();
+            const payload = resPayloadOrMaker;
+            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            loggerBody();
+            loggerTail();
+            
+            return payload;
+        }
+    } else {
+        logger = async () => {
+            loggerHead();
+            const payload = await resPayloadOrMaker();
+            logMessage[`[${ method }] ${hostname} ➔ ${path}`] = { resPayload: payload };
+            loggerBody();
+            loggerTail();
+
+            return payload;
+        };
+    }
+
+    return logger;
 }
