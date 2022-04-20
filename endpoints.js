@@ -7,6 +7,7 @@
 import config from '../api-config.js';
 import { validatePgpMessageAndGetDataFromDb } from './crypto_utils.js';
 import { fetchById, fetchFromDb } from './db_utils.js';
+import { errBadReq } from './shared.js';
 import { makeLogger } from './utils.js';
 
 const teachersTimetablesUrl = config.baseUrl + config.paths.teachersTimetables;
@@ -43,8 +44,10 @@ function setupPostEndpoint(keyPair, app, path, url, by) {
 }
 
 function makeResponse(res, payload) {
-    if (payload.error)
-        res.sendStatus(payload.error);
+    if (!payload)
+        res.sendStatus(errBadReq.error);
+    else if (payload.error)
+        res.sendStatus(errBadReq.error);
     else
         res.send(payload);
 }
