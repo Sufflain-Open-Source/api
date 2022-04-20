@@ -33,14 +33,20 @@ export function setupEndpoints(app, keyPair) {
 }
 
 function setupPostEndpoint(keyPair, app, path, url, by) {
-    app.post(path, async (req, res) => (
+    app.post(path, async (req, res) => {
+        if ((path == '/teacher-timetable/:tid' || path == '/timetable/:gid')
+            &&
+            (by == null || by == undefined)) {
+            res.sendStatus(errBadReq.error);
+            return;
+        }
         makeResponse(res, await makeLogger(req, async () => (
             await validatePgpMessageAndGetDataFromDb(req.body.payload, async () => (
                 await by ? fetchById(req.params[by], url) : fetchFromDb(url)
             ),
                 keyPair)
         ))())
-    ));
+    });
 }
 
 function makeResponse(res, payload) {
