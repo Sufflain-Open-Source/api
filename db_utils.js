@@ -11,6 +11,9 @@ import fetch from 'node-fetch';
 export async function fetchById(id, path) {
     const allTimetables = await fetchFromDb(path);
     const timetable = allTimetables[id];
+    
+    if (!timetable)
+        return {};
 
     return timetable;
 }
